@@ -2,7 +2,8 @@ import pygame
 import pymunk
 import numpy as np
 
-BLACK = (0, 0, 0, 109)
+BLACK = (0, 0, 0, 100)
+WHITE = (255, 255, 255, 100)
 RED = (255, 0, 0, 100)
 YELLOW = (255, 255, 100)
 BLUE = (0, 0, 255, 100)
@@ -10,7 +11,7 @@ BLUE = (0, 0, 255, 100)
 NUMS_TO_COLORS = {1: RED, -1: YELLOW, 0: BLACK}
 
 class Board:
-    def __init__(self, rows: int, cols: int, left_corner_x: int, left_corner_y: int, width: int, height: int, color: tuple[int, int, int]):
+    def __init__(self, rows: int, cols: int, left_corner_x: int, left_corner_y: int, width: int, height: int, color: tuple[int, int, int], consecutive_tokens: int):
         self.rows = rows
         self.cols = cols
 
@@ -23,11 +24,12 @@ class Board:
         self.color = color
 
         self.chip_matrix = np.zeros((self.rows, self.cols), int)
+        self.consecutive_tokens = consecutive_tokens
 
         self.buffer = 5
         self.token_radius = (self.height - (self.rows + 1) * self.buffer) / (2 * self.rows)
 
-    def draw(self, space):
+    def draw(self, space, clear_board: bool = False):
         body = pymunk.Body(body_type = pymunk.Body.STATIC)
         body.position = self.left_corner_x + self.width/2, self.left_corner_y + self.height/2
 
@@ -42,7 +44,7 @@ class Board:
                                  self.left_corner_y + (i + 1) * self.buffer + (2 * i + 1) * self.token_radius)
 
                 shape = pymunk.Circle(body, self.token_radius)
-                shape.color = NUMS_TO_COLORS[self.chip_matrix[i][j]]
+                shape.color = NUMS_TO_COLORS[self.chip_matrix[i][j]] if not clear_board else BLACK
                 
                 space.add(body, shape)                
 
@@ -61,6 +63,9 @@ class Board:
     def set_chip_matrix(self, element_x: int, element_y: int, new_num: int):
         self.chip_matrix[element_x][element_y] = new_num
     
+    def clear_chip_matrix(self):
+        self.chip_matrix = np.zeros((self.rows, self.cols), int)
+    
     def get_left_corner_x(self):
         return self.left_corner_x
     
@@ -75,24 +80,84 @@ class Board:
     
     def check_win(self):
         for i in range(self.rows):
-            for j in range(self.cols - 3):
-                if(self.chip_matrix[i][j] != 0 and self.chip_matrix[i][j] == self.chip_matrix[i][j + 1] and self.chip_matrix[i][j] == self.chip_matrix[i][j + 2] and self.chip_matrix[i][j] == self.chip_matrix[i][j + 3]):
-                    return self.chip_matrix[i][j]
+            for j in range(self.cols - self.consecutive_tokens + 1):
+                check = True
+                if(self.chip_matrix[i][j] == 0):
+                    check = False
+
+                if(check):
+                    for k in range(self.consecutive_tokens):
+                        if(self.chip_matrix[i][j] != self.chip_matrix[i][j + k]):
+                            check = False
+                            break
+                
+                if(check):
+                    start_pos = (self.left_corner_x + (j + 1) * self.buffer + (2 * j + 1) * self.token_radius, 
+                                 self.left_corner_y + (i + 1) * self.buffer + (2 * i + 1) * self.token_radius)
+                    end_pos = (self.left_corner_x + (j + self.consecutive_tokens - 1 + 1) * self.buffer + (2 * (j + self.consecutive_tokens - 1) + 1) * self.token_radius, 
+                               self.left_corner_y + (i + 1) * self.buffer + (2 * i + 1) * self.token_radius)
+                    
+                    return self.chip_matrix[i][j], start_pos, end_pos
         
-        for i in range(self.rows - 3):
+        for i in range(self.rows - self.consecutive_tokens + 1):
             for j in range(self.cols):
-                if(self.chip_matrix[i][j] != 0 and self.chip_matrix[i][j] == self.chip_matrix[i + 1][j] and self.chip_matrix[i][j] == self.chip_matrix[i + 2][j] and self.chip_matrix[i][j] == self.chip_matrix[i + 3][j]):
-                    return self.chip_matrix[i][j]
+                check = True
+                if(self.chip_matrix[i][j] == 0):
+                    check = False
+                
+                if(check):
+                    for k in range(self.consecutive_tokens):
+                        if(self.chip_matrix[i][j] != self.chip_matrix[i + k][j]):
+                            check = False
+                            break
+                
+                if(check):
+                    start_pos = (self.left_corner_x + (j + 1) * self.buffer + (2 * j + 1) * self.token_radius, 
+                                 self.left_corner_y + (i + 1) * self.buffer + (2 * i + 1) * self.token_radius)
+                    end_pos = (self.left_corner_x + (j + 1) * self.buffer + (2 * j + 1) * self.token_radius, 
+                               self.left_corner_y + (i + self.consecutive_tokens - 1 + 1) * self.buffer + (2 * (i + self.consecutive_tokens - 1) + 1) * self.token_radius) 
+                    
+                    return self.chip_matrix[i][j], start_pos, end_pos
         
         for i in range(self.rows - 3):
             for j in range(self.cols - 3):
-                if(self.chip_matrix[i][j] != 0 and self.chip_matrix[i][j] == self.chip_matrix[i + 1][j + 1] and self.chip_matrix[i][j] == self.chip_matrix[i + 2][j + 2] and self.chip_matrix[i][j] == self.chip_matrix[i + 3][j + 3]):
-                    return self.chip_matrix[i][j]
+                check = True
+                if(self.chip_matrix[i][j] == 0):
+                    check = False
+                
+                if(check):
+                    for k in range(self.consecutive_tokens):
+                        if(self.chip_matrix[i][j] != self.chip_matrix[i + k][j + k]):
+                            check = False
+                            break
+                
+                if(check):
+                    start_pos = (self.left_corner_x + (j + 1) * self.buffer + (2 * j + 1) * self.token_radius, 
+                                 self.left_corner_y + (i + 1) * self.buffer + (2 * i + 1) * self.token_radius)
+                    end_pos = (self.left_corner_x + (j + self.consecutive_tokens - 1 + 1) * self.buffer + (2 * (j + self.consecutive_tokens - 1) + 1) * self.token_radius, 
+                               self.left_corner_y + (i + self.consecutive_tokens - 1 + 1) * self.buffer + (2 * (i + self.consecutive_tokens - 1) + 1) * self.token_radius)
+                    
+                    return self.chip_matrix[i][j], start_pos, end_pos
     
-        for i in range(3, self.rows):
-            for j in range(self.cols - 3):
-                if(self.chip_matrix[i][j] != 0 and self.chip_matrix[i][j] == self.chip_matrix[i - 1][j + 1] and self.chip_matrix[i][j] == self.chip_matrix[i - 2][j + 2] and self.chip_matrix[i][j] == self.chip_matrix[i - 3][j + 3]):
-                    return self.chip_matrix[i][j]
+        for i in range(self.consecutive_tokens - 1, self.rows):
+            for j in range(self.cols - self.consecutive_tokens + 1):
+                check = True
+                if(self.chip_matrix[i][j] == 0):
+                    check = False
+                
+                if(check):
+                    for k in range(self.consecutive_tokens):
+                        if(self.chip_matrix[i][j] != self.chip_matrix[i - k][j + k]):
+                            check = False
+                            break
+                
+                if(check):
+                    start_pos = (self.left_corner_x + (j + 1) * self.buffer + (2 * j + 1) * self.token_radius, 
+                                self.left_corner_y + (i + 1) * self.buffer + (2 * i + 1) * self.token_radius),
+                    end_pos = (self.left_corner_x + (j + self.consecutive_tokens - 1 + 1) * self.buffer + (2 * (j + self.consecutive_tokens - 1) + 1) * self.token_radius, 
+                               self.left_corner_y + (i - self.consecutive_tokens + 1 + 1) * self.buffer + (2 * (i - self.consecutive_tokens + 1) + 1) * self.token_radius),  
+
+                    return self.chip_matrix[i][j], start_pos, end_pos
         
         full = True
         for i in range(self.rows):
@@ -101,9 +166,9 @@ class Board:
                     full = False
                     break
         if(full):
-            return 2
+            return 2, None, None
         
-        return 0
+        return 0, None, None
                
 
 
